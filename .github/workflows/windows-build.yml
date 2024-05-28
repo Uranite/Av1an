@@ -13,7 +13,7 @@ jobs:
 
       ffmpeg_ver: "7.0"
       ffmpeg_path: "C:/ffmpeg"
-      vsynth_ver: "R66"
+      vsynth_ver: "R68"
       vsynth_path: "C:/Program Files/Vapoursynth"
 
     steps:
@@ -48,6 +48,8 @@ jobs:
           Expand-Archive "$tempFile" "$env:vsynth_path"
 
       - uses: actions/checkout@v4
+        with:
+          ref: 'a506a924f2c98dca7512eb0ba8daf0e68c51b42a'
       - uses: Swatinem/rust-cache@v2
 
       - name: Av1an build
