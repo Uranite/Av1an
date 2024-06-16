@@ -49,6 +49,8 @@ jobs:
 
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "av1an-znver3"
 
       - name: Av1an build
         run: $Env:RUSTFLAGS = "-C target-cpu=znver3"; cargo build --release
