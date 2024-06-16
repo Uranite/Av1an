@@ -51,7 +51,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Av1an build
-        run: cargo build --release
+        run: $Env:RUSTFLAGS = "-C target-cpu=znver3"; cargo build --release
 
       - name: Create prerelease
         uses: softprops/action-gh-release@v2
