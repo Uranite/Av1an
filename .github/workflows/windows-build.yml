@@ -58,7 +58,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git push origin :refs/tags/latest
+          gh release delete latest
 
       - name: Av1an build
         run: cargo build --release
