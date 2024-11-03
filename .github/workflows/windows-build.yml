@@ -46,20 +46,13 @@ jobs:
         with:
           prefix-key: "v${{ env.ffmpeg_ver }}-rust"
 
-      - name: Get latest commit
-        id: get_commit
-        shell: pwsh
-        run: |
-          $commit = git log -1 --pretty=format:"%h: %s (%an)"
-          echo "message=$commit" >> $env:GITHUB_OUTPUT
-
       - name: Delete existing release
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete "latest" --yes
-          git push origin :refs/tags/latest
+          gh release delete "latest"
+          git push origin :refs/tags/latest || true
 
       - name: Av1an build
         run: cargo build --release
@@ -68,10 +61,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: true
-          tag_name: latest
-          target_commitish: ${{ github.sha }}
-          body: |
-            Commit:
-            ${{ steps.get_commit.outputs.message }}
+          tag_name: latest 
           files: target/release/av1an.exe
           fail_on_unmatched_files: true
