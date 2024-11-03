@@ -57,7 +57,9 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release delete "latest" --yes
+        run: |
+          gh release delete "latest" --yes
+          git push origin :refs/tags/latest
 
       - name: Av1an build
         run: cargo build --release
