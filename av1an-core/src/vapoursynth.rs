@@ -13,6 +13,49 @@ use vapoursynth::video_info::VideoInfo;
 use super::ChunkMethod;
 use crate::util::to_absolute_path;
 
+// Embed the VS script content directly to avoid path resolution issues
+const VS_SCRIPT_TEMPLATE: &str = r"import os
+from vapoursynth import core
+
+# Set cache size to 1GB
+core.max_cache_size = 1024
+
+source = {source_path}
+chunk_method = {chunk_method}
+cache_file = {cache_file}
+
+# Default valid chunk methods
+VALID_CHUNK_METHODS: list[str] = ['lsmash', 'ffms2', 'dgdecnv', 'bestsource']
+
+# Ensure chunk_method is valid
+if chunk_method not in VALID_CHUNK_METHODS:
+    raise ValueError(f'Invalid chunk method: {chunk_method}')
+
+# Check if source is provided
+if not source:
+    raise ValueError('Source path not provided')
+
+# Ensure source exists
+if not os.path.exists(source):
+    raise ValueError('Source path does not exist')
+
+# Import video
+match (chunk_method): #type: ignore
+    case 'lsmash':
+        video = core.lsmas.LWLibavSource(source, cachefile=cache_file)
+    case 'ffms2':
+        video = core.ffms2.Source(source, cachefile=cache_file)
+    case 'dgdecnv':
+        video = core.dgdecodenv.DGSource(source)
+    case 'bestsource':
+        try:
+            video = core.bs.VideoSource(source, cachepath=cache_file, cachemode=4)
+        except Exception:
+            video = core.bs.VideoSource(source, cachepath=cache_file)
+
+# Output video
+video.set_output()";
+
 static VAPOURSYNTH_PLUGINS: Lazy<HashSet<String>> = Lazy::new(|| {
   let environment = Environment::new().expect("Failed to initialize VapourSynth environment");
   let core = environment
@@ -213,7 +256,8 @@ pub fn create_vs_file(
       _ => return Err(anyhow!("invalid chunk method")),
     }
   )))?;
-  let chunk_method_lower = match chunk_method {
+
+  let chunk_method = match chunk_method {
     ChunkMethod::FFMS2 => "ffms2",
     ChunkMethod::LSMASH => "lsmash",
     ChunkMethod::DGDECNV => "dgdecnv",
@@ -221,8 +265,7 @@ pub fn create_vs_file(
     _ => return Err(anyhow!("invalid chunk method")),
   };
 
-  if chunk_method == ChunkMethod::DGDECNV {
-    // Run dgindexnv to generate the .dgi index file
+  if chunk_method == "dgdecnv" {
     Command::new("dgindexnv")
       .arg("-h")
       .arg("-i")
@@ -232,28 +275,22 @@ pub fn create_vs_file(
       .output()?;
   }
 
-  // Include rich loadscript.vpy and specify source, chunk_method, and cache_file
-  let load_script_text = include_str!("loadscript.vpy")
+  let source_path = if chunk_method == "dgdecnv" {
+    &dgindex_path
+  } else {
+    &source
+  };
+
+  // Generate the script content with the proper paths
+  let script_content = VS_SCRIPT_TEMPLATE
+    .replace("{source_path}", &format!("{source_path:?}"))
+    .replace("{chunk_method}", &format!("{chunk_method:?}"))
     .replace(
-      "source = os.environ.get('AV1AN_SOURCE', None)",
-      &format!(
-        "source = {:?}",
-        match chunk_method {
-          ChunkMethod::DGDECNV => &dgindex_path,
-          _ => &source,
-        }
-      ),
-    )
-    .replace(
-      "chunk_method = os.environ.get('AV1AN_CHUNK_METHOD', None)",
-      &format!("chunk_method = {chunk_method_lower:?}"),
-    )
-    .replace(
-      "cache_file = os.environ.get('AV1AN_CACHE_FILE', None)",
-      &format!("cache_file = {:?}", to_absolute_path(cache_file.as_path())?),
+      "{cache_file}",
+      &format!("{:?}", to_absolute_path(cache_file.as_path())?),
     );
 
-  load_script.write_all(load_script_text.as_bytes())?;
+  load_script.write_all(script_content.as_bytes())?;
 
   Ok(load_script_path)
 }
