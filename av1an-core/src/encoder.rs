@@ -752,6 +752,8 @@ impl Encoder {
       ],
       Self::x265 => inplace_vec![
         "x265",
+        "--input",
+        "-",
         "--log-level",
         "0",
         "--no-progress",
@@ -793,6 +795,8 @@ impl Encoder {
       ],
       Self::x265 => inplace_vec![
         "x265",
+        "--input",
+        "-",
         "--log-level",
         "0",
         "--no-progress",
