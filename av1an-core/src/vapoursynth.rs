@@ -250,7 +250,10 @@ pub fn create_vs_file(
     )
     .replace(
       "cache_file = os.environ.get('AV1AN_CACHE_FILE', None)",
-      &format!("cache_file = {:?}", to_absolute_path(cache_file.as_path())?),
+      &format!(
+        "cache_file = r\"{}\"",
+        to_absolute_path(cache_file.as_path())?.display()
+      ),
     );
 
   load_script.write_all(load_script_text.as_bytes())?;
