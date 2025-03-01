@@ -123,10 +123,7 @@ impl Input {
         ffmpeg::num_frames(path.as_path()).map_err(|_| anyhow::anyhow!(FAIL_MSG))?
       }
       path => vapoursynth::num_frames(
-        vs_script_path
-          .as_ref()
-          .map(|p| p.as_path())
-          .unwrap_or(path.as_path()),
+        vs_script_path.as_deref().unwrap_or(path.as_path()),
         self.as_vspipe_args_map()?,
       )
       .map_err(|_| anyhow::anyhow!(FAIL_MSG))?,
