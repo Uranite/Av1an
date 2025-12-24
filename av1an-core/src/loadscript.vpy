@@ -1,5 +1,6 @@
 import os
-from vapoursynth import core
+import vapoursynth as vs
+core = vs.core
 
 source = os.environ.get("AV1AN_SOURCE", None)
 chunk_method = os.environ.get("AV1AN_CHUNK_METHOD", None)
@@ -41,4 +42,50 @@ if perform_scene_detection is None:
 
 
 # Output video
+select_every = globals().get("AV1AN_SELECT_EVERY", None)
+if select_every is not None:
+    video = video.std.SelectEvery(cycle=int(select_every), offsets=0)
+
+pixel_format = globals().get("AV1AN_PIX_FMT", None)
+if pixel_format is not None:
+    fmt_map = {
+        "yuv420p": vs.YUV420P8,
+        "yuv422p": vs.YUV422P8,
+        "yuv444p": vs.YUV444P8,
+        "yuv410p": vs.YUV410P8,
+        "yuv411p": vs.YUV411P8,
+        "yuv440p": vs.YUV440P8,
+        "yuv420p9le": vs.YUV420P9,
+        "yuv422p9le": vs.YUV422P9,
+        "yuv444p9le": vs.YUV444P9,
+        "yuv420p10le": vs.YUV420P10,
+        "yuv422p10le": vs.YUV422P10,
+        "yuv444p10le": vs.YUV444P10,
+        "yuv420p12le": vs.YUV420P12,
+        "yuv422p12le": vs.YUV422P12,
+        "yuv444p12le": vs.YUV444P12,
+        "yuv420p14le": vs.YUV420P14,
+        "yuv422p14le": vs.YUV422P14,
+        "yuv444p14le": vs.YUV444P14,
+        "yuv420p16le": vs.YUV420P16,
+        "yuv422p16le": vs.YUV422P16,
+        "yuv444p16le": vs.YUV444P16,
+        "rgb24": vs.RGB24,
+        "rgb27le": vs.RGB27,
+        "rgb30le": vs.RGB30,
+        "rgb48le": vs.RGB48,
+    }
+    
+    fmt = fmt_map.get(pixel_format)
+    if fmt is None:
+        try:
+            fmt = getattr(vs, pixel_format.upper())
+        except AttributeError:
+             pass
+
+    if fmt is not None:
+        video = video.resize.Bicubic(format=fmt)
+    else:
+        raise ValueError(f"Unsupported or unknown pixel format: {pixel_format}")
+
 video.set_output()

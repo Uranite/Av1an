@@ -555,11 +555,27 @@ impl TargetQuality {
             self.video_params.clone(),
         );
 
-        let source_cmd = chunk
+        let mut source_cmd = chunk
             .proxy_cmd
             .clone()
             .map_or_else(|| chunk.source_cmd.clone(), |proxy_cmd| proxy_cmd);
-        let (ff_cmd, output) = cmd.clone();
+        let (mut ff_cmd, output) = cmd.clone();
+
+        if let Some(cmd) = source_cmd.first() {
+            if cmd == "vspipe" {
+                if self.probing_rate > 1 {
+                    source_cmd.extend([
+                        "-a".into(),
+                        format!("AV1AN_SELECT_EVERY={}", self.probing_rate).into(),
+                    ]);
+                }
+                source_cmd.extend([
+                    "-a".into(),
+                    format!("AV1AN_PIX_FMT={}", self.pix_format.to_pix_fmt_string()).into(),
+                ]);
+                ff_cmd = None;
+            }
+        }
 
         thread::scope(move |scope| {
             let mut source = if let [pipe_cmd, args @ ..] = &*source_cmd {
