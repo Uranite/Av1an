@@ -254,7 +254,7 @@ fn validate_zones_target_quality() {
         name:  crate::ProbingStatisticName::Mode,
         value: None,
     };
-    let desired_interpolation_method4 = "natural";
+    let desired_interpolation_method4 = "fritschcarlson";
     let desired_interpolation_method5 = "cubic";
 
     let input = format!(
