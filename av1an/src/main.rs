@@ -710,26 +710,26 @@ pub struct CliOpts {
     /// 4th round methods (3 known points):
     ///   linear    - Simple linear interpolation using the 2 closest points. Fast and stable, good for monotonic data.
     ///   quadratic - Quadratic interpolation using all 3 points. Better curve fitting than linear, moderate accuracy.
-    ///   natural   - Natural cubic spline interpolation. Smooth curves with natural boundary conditions. (default)
+    ///   fritschcarlson    - Fritsch-Carlson Monotone Cubic Spline interpolation. Smooth curves with natural boundary conditions. (default)
     ///
     /// 5th round methods (4 known points):
     ///   linear                  - Simple linear interpolation using 2 closest points. Most stable for narrow ranges.
     ///   quadratic               - Quadratic interpolation (Lagrange method) using 3 best points. Good balance of accuracy and stability.
-    ///   natural                 - Natural cubic spline interpolation. Smooth curves, good for well-behaved data.
+    ///   fritschcarlson          - Fritsch-Carlson Monotone Cubic Spline interpolation. Smooth curves, good for well-behaved data.
     ///   pchip                   - Piecewise Cubic Hermite Interpolation. Preserves monotonicity, prevents overshooting. (default)
     ///   catmull                 - Catmull-Rom spline interpolation. Smooth curves that pass through all points.
     ///   akima                   - Akima spline interpolation. Reduces oscillations. Beware: Designed for 5 data points originally.
     ///   cubic | cubicpolynomial - Cubic polynomial through all 4 points. High accuracy but can overshoot dramatically.
     ///
     /// Recommendations:
-    ///   - For most content:      natural-pchip      - Good balance of accuracy and stability (tested)
-    ///   - For difficult content: quadratic-natural  - More conservative, less prone to overshooting
-    ///   - For fine-tuning:       linear-linear      - Most predictable behavior, good for testing
+    ///   - For most content:      fritschcarlson-pchip       - Good balance of accuracy and stability (tested)
+    ///   - For difficult content: quadratic-fritschcarlson   - More conservative, less prone to overshooting
+    ///   - For fine-tuning:       linear-linear              - Most predictable behavior, good for testing
     ///
     /// Examples:
-    ///   --interp-method natural-pchip      # Default: balanced accuracy and stability
-    ///   --interp-method quadratic-akima    # Experimental
-    ///   --interp-method linear-catmull     # Simple start, smooth finish
+    ///   --interp-method fritschcarlson-pchip       # Default: balanced accuracy and stability
+    ///   --interp-method quadratic-akima            # Experimental
+    ///   --interp-method linear-catmull             # Simple start, smooth finish
     #[clap(long, help_heading = "Target Quality", value_parser = TargetQuality::parse_interp_method, verbatim_doc_comment)]
     pub interp_method: Option<(InterpolationMethod, InterpolationMethod)>,
     /// The metric used for Target Quality mode
