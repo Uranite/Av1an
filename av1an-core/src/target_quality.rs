@@ -19,10 +19,11 @@ use crate::{
     ffmpeg::FFPixelFormat,
     interpol::{
         akima_interpolate,
+        akima_spline,
         catmull_rom_interpolate,
         cubic_polynomial_interpolate,
+        fritsch_carlson,
         linear_interpolate,
-        natural_cubic_spline,
         pchip_interpolate,
         quadratic_interpolate,
     },
@@ -45,7 +46,7 @@ use crate::{
 pub enum InterpolationMethod {
     Linear,
     Quadratic,
-    Natural,
+    FritschCarlson,
     Pchip,
     Catmull,
     Akima,
@@ -60,7 +61,7 @@ impl FromStr for InterpolationMethod {
         match s.to_lowercase().as_str() {
             "linear" => Ok(Self::Linear),
             "quadratic" => Ok(Self::Quadratic),
-            "natural" => Ok(Self::Natural),
+            "fritschcarlson" => Ok(Self::FritschCarlson),
             "pchip" => Ok(Self::Pchip),
             "catmull" => Ok(Self::Catmull),
             "akima" => Ok(Self::Akima),
@@ -814,7 +815,7 @@ impl TargetQuality {
         match method4 {
             InterpolationMethod::Linear
             | InterpolationMethod::Quadratic
-            | InterpolationMethod::Natural => {},
+            | InterpolationMethod::FritschCarlson => {},
             _ => {
                 return Err(anyhow::anyhow!(
                     "Method '{}' not available for 4th round",
@@ -938,7 +939,8 @@ fn predict_quantizer(
                 },
                 3 => {
                     // 4th probe: configurable method
-                    let method = interp_method.map_or(InterpolationMethod::Natural, |(m, _)| m);
+                    let method =
+                        interp_method.map_or(InterpolationMethod::FritschCarlson, |(m, _)| m);
                     match method {
                         InterpolationMethod::Linear => linear_interpolate(
                             &[scores[0], scores[1]],
@@ -950,8 +952,8 @@ fn predict_quantizer(
                             &[quantizers[0], quantizers[1], quantizers[2]],
                             target,
                         ),
-                        InterpolationMethod::Natural => {
-                            natural_cubic_spline(&scores, &quantizers, target)
+                        InterpolationMethod::FritschCarlson => {
+                            fritsch_carlson(&scores, &quantizers, target)
                         },
                         _ => None,
                     }
@@ -969,8 +971,8 @@ fn predict_quantizer(
                         InterpolationMethod::Quadratic => {
                             quadratic_interpolate(&[s[0], s[1], s[2]], &[q[0], q[1], q[2]], target)
                         },
-                        InterpolationMethod::Natural => {
-                            natural_cubic_spline(&scores, &quantizers, target)
+                        InterpolationMethod::FritschCarlson => {
+                            fritsch_carlson(&scores, &quantizers, target)
                         },
                         InterpolationMethod::Pchip => pchip_interpolate(s, q, target),
                         InterpolationMethod::Catmull => catmull_rom_interpolate(s, q, target),
@@ -980,7 +982,7 @@ fn predict_quantizer(
                         },
                     }
                 },
-                _ => None,
+                _ => akima_spline(&scores, &quantizers, target),
             };
 
             result.unwrap_or_else(|| {

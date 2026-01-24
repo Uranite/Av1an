@@ -16,103 +16,46 @@ pub fn linear_interpolate(x: &[f64; 2], y: &[f64; 2], xi: f64) -> Option<f64> {
     Some(t.mul_add(y[1] - y[0], y[0]))
 }
 
-pub fn natural_cubic_spline(x: &[f64], y: &[f64], xi: f64) -> Option<f64> {
+pub fn fritsch_carlson(x: &[f64], y: &[f64], xi: f64) -> Option<f64> {
     let n = x.len();
-    if n < 3 || n != y.len() {
+    if n != 3 || n != y.len() || xi < x[0] || xi > x[n - 1] {
         return None;
     }
 
-    // Noramally, no bounds check is needed - we're interpolating, not extrapolating
-    // The target (xi) is a score value we're looking for, not restricted to input
-    // range
+    let k = (0..2).find(|&i| xi >= x[i] && xi <= x[i + 1]).unwrap_or(0);
 
-    // Verify xi is within the observed range (it should be by algorithm design)
-    if xi < x[0] || xi > x[n - 1] {
-        trace!(
-            "Natural cubic spline: unexpected extrapolation case - xi = {xi}, range = [{}, {}]",
-            x[0],
-            x[n - 1]
-        );
-        return None;
+    let d0 = (y[1] - y[0]) / (x[1] - x[0]);
+    let d1 = (y[2] - y[1]) / (x[2] - x[1]);
+
+    let mut m = [0.0; 3];
+
+    m[0] = d0;
+    m[2] = d1;
+
+    if d0 * d1 <= 0.0 {
+        m[1] = 0.0;
+    } else {
+        let h0 = x[1] - x[0];
+        let h1 = x[2] - x[1];
+        let w1 = 2.0f64.mul_add(h1, h0);
+        let w2 = 2.0f64.mul_add(h0, h1);
+        m[1] = (w1 + w2) / (w1 / d0 + w2 / d1);
     }
 
-    // Calculate intervals
-    let mut h = vec![0.0; n - 1];
-    for i in 0..n - 1 {
-        h[i] = x[i + 1] - x[i];
-        if h[i] <= 0.0 {
-            trace!(
-                "Natural cubic spline: x values not strictly increasing at index {i}: {prev} >= \
-                 {next}",
-                prev = x[i],
-                next = x[i + 1]
-            );
-            return None; // x must be strictly increasing
-        }
-    }
+    let h = x[k + 1] - x[k];
+    let t = (xi - x[k]) / h;
+    let t2 = t * t;
+    let t3 = t2 * t;
 
-    // Set up tridiagonal system for second derivatives
-    let mut a = vec![0.0; n];
-    let mut b = vec![2.0; n];
-    let mut c = vec![0.0; n];
-    let mut d = vec![0.0; n];
+    let h00 = 2.0f64.mul_add(t3, 3.0f64.mul_add(-t2, 1.0));
+    let h10 = 2.0f64.mul_add(-t2, t3.mul_add(1.0, t));
+    let h01 = (-2.0f64).mul_add(t3, 3.0 * t2);
+    let h11 = t3 - t2;
 
-    // Natural boundary conditions: second derivative = 0 at endpoints
-    b[0] = 1.0;
-    b[n - 1] = 1.0;
-
-    // Interior points
-    for i in 1..n - 1 {
-        a[i] = h[i - 1];
-        b[i] = 2.0 * (h[i - 1] + h[i]);
-        c[i] = h[i];
-        d[i] = 3.0 * ((y[i + 1] - y[i]) / h[i] - (y[i] - y[i - 1]) / h[i - 1]);
-    }
-
-    // Solve tridiagonal system (Thomas algorithm)
-    let mut m = vec![0.0; n];
-    let mut l = vec![0.0; n];
-    let mut z = vec![0.0; n];
-
-    l[0] = b[0];
-    if l[0] == 0.0 {
-        trace!("Natural cubic spline: Singular matrix at first step");
-        return None;
-    }
-    for i in 1..n {
-        l[i] = b[i] - a[i] * c[i - 1] / l[i - 1];
-        if l[i] == 0.0 {
-            trace!("Natural cubic spline: Singular matrix at step {i}");
-            return None;
-        }
-        z[i] = a[i].mul_add(-z[i - 1], d[i]) / l[i];
-    }
-
-    m[n - 1] = z[n - 1];
-    for i in (0..n - 1).rev() {
-        m[i] = z[i] - c[i] * m[i + 1] / l[i];
-    }
-
-    // Find the interval containing xi
-    let mut k = 0;
-    for i in 0..n - 1 {
-        if xi >= x[i] && xi <= x[i + 1] {
-            k = i;
-            break;
-        }
-    }
-
-    // Evaluate cubic polynomial
-    let dx = xi - x[k];
-    let h_k = h[k];
-
-    let a_coeff = y[k];
-    let b_coeff = (y[k + 1] - y[k]) / h_k - h_k * 2.0f64.mul_add(m[k], m[k + 1]) / 3.0;
-    let c_coeff = m[k];
-    let d_coeff = (m[k + 1] - m[k]) / (3.0 * h_k);
-
-    // a_coeff + b_coeff * dx + c_coeff * dx * dx + d_coeff * dx * dx * dx
-    Some(b_coeff.mul_add(dx, a_coeff) + c_coeff.mul_add(dx.powi(2), d_coeff * dx.powi(3)))
+    Some((h11 * h).mul_add(
+        m[k + 1],
+        h00.mul_add(y[k], h10.mul_add(h * m[k], h01 * y[k + 1])),
+    ))
 }
 
 pub fn pchip_interpolate(x: &[f64; 4], y: &[f64; 4], xi: f64) -> Option<f64> {
@@ -399,14 +342,71 @@ pub fn akima_interpolate(x: &[f64; 4], y: &[f64; 4], xi: f64) -> Option<f64> {
     ))
 }
 
+pub fn akima_spline(x: &[f64], y: &[f64], xi: f64) -> Option<f64> {
+    let n = x.len();
+    if n < 5 || y.len() != n {
+        return None;
+    }
+
+    for i in 0..n - 1 {
+        if x[i + 1] <= x[i] {
+            return None;
+        }
+    }
+
+    if xi < x[0] || xi > x[n - 1] {
+        return None;
+    }
+
+    let k = (0..n - 1).rev().find(|&i| xi >= x[i]).unwrap_or(0);
+
+    let mut m = vec![0.0; n + 1];
+    for i in 0..n - 1 {
+        m[i + 1] = (y[i + 1] - y[i]) / (x[i + 1] - x[i]);
+    }
+
+    m[0] = 2.0f64.mul_add(m[1], -m[2]);
+    m[n] = 2.0f64.mul_add(m[n - 1], -m[n - 2]);
+
+    let mut t = vec![0.0; n];
+    for i in 0..n - 1 {
+        let w1 = (m[i + 2] - m[i + 1]).abs();
+        let w2 = (m[i] - m[i + 1]).abs();
+
+        if w1 + w2 < 1e-10 {
+            t[i] = 0.5 * (m[i] + m[i + 1]);
+        } else {
+            t[i] = w1.mul_add(m[i], w2 * m[i + 1]) / (w1 + w2);
+        }
+    }
+
+    t[n - 1] = m[n - 1];
+
+    let h = x[k + 1] - x[k];
+    let s = (xi - x[k]) / h;
+    let s2 = s * s;
+    let s3 = s2 * s;
+
+    let h00 = 2.0f64.mul_add(s3, -3.0 * s2) + 1.0;
+    let h10 = 2.0f64.mul_add(-s2, s3) + s;
+    let h01 = (-2.0f64).mul_add(s3, 3.0 * s2);
+    let h11 = s3 - s2;
+
+    Some(h00.mul_add(
+        y[k],
+        (h10 * h).mul_add(t[k], (h11 * h).mul_add(t[k + 1], h01 * y[k + 1])),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         akima_interpolate as akima_interpolate_impl,
+        akima_spline as akima_spline_impl,
         catmull_rom_interpolate as catmull_rom_interpolate_impl,
         cubic_polynomial_interpolate as cubic_polynomial_interpolate_impl,
+        fritsch_carlson as fritsch_carlson_impl,
         linear_interpolate as linear_interpolate_impl,
-        natural_cubic_spline as natural_cubic_spline_impl,
         pchip_interpolate as pchip_interpolate_impl,
         quadratic_interpolate as quadratic_interpolate_impl,
     };
@@ -454,30 +454,27 @@ mod tests {
     }
 
     #[test]
-    fn natural_cubic_spline() {
+    fn fritsch_carlson() {
         // CRF 10 (84.872162), CRF 20 (78.517479), CRF 30 (72.812233)
         let x = vec![72.812233, 78.517479, 84.872162]; // scores (ascending order)
         let y = vec![30.0, 20.0, 10.0]; // CRFs
 
         // Test exact points
         assert!(
-            (natural_cubic_spline_impl(&x, &y, 72.812233).expect("result should exist") - 30.0)
-                .abs()
+            (fritsch_carlson_impl(&x, &y, 72.812233).expect("result should exist") - 30.0).abs()
                 < 1e-10
         );
         assert!(
-            (natural_cubic_spline_impl(&x, &y, 78.517479).expect("result should exist") - 20.0)
-                .abs()
+            (fritsch_carlson_impl(&x, &y, 78.517479).expect("result should exist") - 20.0).abs()
                 < 1e-10
         );
         assert!(
-            (natural_cubic_spline_impl(&x, &y, 84.872162).expect("result should exist") - 10.0)
-                .abs()
+            (fritsch_carlson_impl(&x, &y, 84.872162).expect("result should exist") - 10.0).abs()
                 < 1e-10
         );
 
         // Test interpolation for score 81.0
-        let result = natural_cubic_spline_impl(&x, &y, 81.0);
+        let result = fritsch_carlson_impl(&x, &y, 81.0);
         assert!(result.is_some());
         assert!(
             result.expect("result should exist") > 10.0
@@ -489,7 +486,7 @@ mod tests {
         let y2 = vec![35.0, 25.0, 15.0]; // CRFs
 
         // Test interpolation for score 82.0
-        let result = natural_cubic_spline_impl(&x2, &y2, 82.0);
+        let result = fritsch_carlson_impl(&x2, &y2, 82.0);
         assert!(result.is_some());
         assert!(
             result.expect("result should exist") > 15.0
@@ -501,7 +498,7 @@ mod tests {
         let y3 = vec![40.0, 30.0, 20.0]; // CRFs
 
         // Test interpolation for score 80.0
-        let result = natural_cubic_spline_impl(&x3, &y3, 80.0);
+        let result = fritsch_carlson_impl(&x3, &y3, 80.0);
         assert!(result.is_some());
         assert!(
             result.expect("result should exist") > 20.0
@@ -511,20 +508,17 @@ mod tests {
         // Test with non-increasing x values (should return None)
         let x_bad = vec![84.872162, 78.517479, 80.0]; // Not properly ordered
         let y_bad = vec![10.0, 20.0, 25.0];
-        assert_eq!(natural_cubic_spline_impl(&x_bad, &y_bad, 79.0), None);
+        assert_eq!(fritsch_carlson_impl(&x_bad, &y_bad, 79.0), None);
 
         // Test with too few points (should return None)
         let x_short = vec![87.0715, 90.0064];
         let y_short = vec![20.0, 10.0];
-        assert_eq!(natural_cubic_spline_impl(&x_short, &y_short, 88.0), None);
+        assert_eq!(fritsch_carlson_impl(&x_short, &y_short, 88.0), None);
 
         // Test with mismatched lengths (should return None)
         let x_mismatch = vec![83.8005, 87.0715, 90.0064];
         let y_mismatch = vec![30.0, 20.0];
-        assert_eq!(
-            natural_cubic_spline_impl(&x_mismatch, &y_mismatch, 85.0),
-            None
-        );
+        assert_eq!(fritsch_carlson_impl(&x_mismatch, &y_mismatch, 85.0), None);
     }
 
     #[test]
