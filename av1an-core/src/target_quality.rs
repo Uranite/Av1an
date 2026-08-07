@@ -826,6 +826,21 @@ impl TargetQuality {
                 ))
             },
         }
+        match method5 {
+            InterpolationMethod::Linear
+            | InterpolationMethod::Quadratic
+            | InterpolationMethod::Natural
+            | InterpolationMethod::Pchip
+            | InterpolationMethod::Catmull
+            | InterpolationMethod::Akima
+            | InterpolationMethod::CubicPolynomial => {},
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Method '{}' not available for 5th round",
+                    parts[1]
+                ))
+            },
+        }
 
         Ok((method4, method5))
     }
