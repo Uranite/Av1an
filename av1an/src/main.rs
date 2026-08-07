@@ -708,9 +708,10 @@ pub struct CliOpts {
     /// Format: --interp-method <method4>-<method5>
     ///
     /// 4th round methods (3 known points):
-    ///   linear    - Simple linear interpolation using the 2 closest points. Fast and stable, good for monotonic data.
-    ///   quadratic - Quadratic interpolation using all 3 points. Better curve fitting than linear, moderate accuracy.
-    ///   natural   - Natural cubic spline interpolation. Smooth curves with natural boundary conditions. (default)
+    ///   linear         - Simple linear interpolation using the 2 closest points. Fast and stable, good for monotonic data.
+    ///   quadratic      - Quadratic interpolation using all 3 points. Better curve fitting than linear, moderate accuracy.
+    ///   natural        - Natural cubic spline interpolation. Smooth curves with natural boundary conditions.
+    ///   fritschcarlson - Fritsch-Carlson Monotone Cubic Spline interpolation. Smooth monotone curves. (default)
     ///
     /// 5th round methods (4 known points):
     ///   linear                  - Simple linear interpolation using 2 closest points. Most stable for narrow ranges.
@@ -722,14 +723,14 @@ pub struct CliOpts {
     ///   cubic | cubicpolynomial - Cubic polynomial through all 4 points. High accuracy but can overshoot dramatically.
     ///
     /// Recommendations:
-    ///   - For most content:      natural-pchip      - Good balance of accuracy and stability (tested)
-    ///   - For difficult content: quadratic-natural  - More conservative, less prone to overshooting
-    ///   - For fine-tuning:       linear-linear      - Most predictable behavior, good for testing
+    ///   - For most content:      fritschcarlson-pchip - Good balance of accuracy and stability (tested)
+    ///   - For difficult content: quadratic-pchip      - More conservative, less prone to overshooting
+    ///   - For fine-tuning:       linear-linear        - Most predictable behavior, good for testing
     ///
     /// Examples:
-    ///   --interp-method natural-pchip      # Default: balanced accuracy and stability
-    ///   --interp-method quadratic-akima    # Experimental
-    ///   --interp-method linear-catmull     # Simple start, smooth finish
+    ///   --interp-method fritschcarlson-pchip      # Default: balanced accuracy and stability
+    ///   --interp-method quadratic-akima           # Experimental
+    ///   --interp-method linear-catmull            # Simple start, smooth finish
     #[clap(long, help_heading = "Target Quality", value_parser = TargetQuality::parse_interp_method, verbatim_doc_comment)]
     pub interp_method: Option<(InterpolationMethod, InterpolationMethod)>,
     /// The metric used for Target Quality mode
